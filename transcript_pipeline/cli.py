@@ -73,6 +73,32 @@ def cmd_list_exchanges(
     return 0
 
 
+def _format_finding_line(f: dict, index: int) -> str:
+    """Human-readable one finding for terminal (uses redacted snippet as match preview)."""
+    det = f["detector_id"]
+    rid = f["rule_id"]
+    label = f.get("label") or ""
+    snip = f.get("redacted_snippet") or ""
+    start = f.get("start", 0)
+    end = f.get("end", 0)
+    # Keep snippet single-line for terminal width
+    one = " ".join(snip.split())
+    if len(one) > 100:
+        one = one[:97] + "…"
+    lines = [
+        f"  {index}. [{det}] {rid}",
+        f"      reason: {label}",
+        f"      matched: {one}",
+        f"      span: chars [{start}, {end})",
+    ]
+    meta = f.get("meta") or {}
+    if meta and not (
+        len(meta) == 1 and meta.get("kind") in ("path_reference", "context")
+    ):
+        lines.append(f"      meta: {meta}")
+    return "\n".join(lines)
+
+
 def cmd_detect(
     db: TranscriptDB,
     project_id: str | None,
@@ -81,6 +107,7 @@ def cmd_detect(
     text_source: str,
     json_out: bool,
     hits_only: bool,
+    compact: bool,
 ) -> int:
     """Run registered detectors on exchange rows from the DB."""
     db.init_schema()
@@ -119,12 +146,18 @@ def cmd_detect(
             f"[id={rec['id']}] {rec['project_id']} / {rec['chat_id']} "
             f"turn={rec['turn_index']} — {s['finding_count']} finding(s)"
         )
-        if rec["findings"]:
+        findings = rec["findings"]
+        if not findings:
+            continue
+        if compact:
             by_d: dict[str, list[str]] = {}
-            for f in rec["findings"]:
+            for f in findings:
                 by_d.setdefault(f["detector_id"], []).append(f["rule_id"])
             for det, rules in sorted(by_d.items()):
                 print(f"  {det}: {', '.join(sorted(set(rules)))}")
+        else:
+            for i, f in enumerate(findings, start=1):
+                print(_format_finding_line(f, i))
     return 0
 
 
@@ -168,6 +201,11 @@ def main() -> int:
         action="store_true",
         help="Only output rows with at least one finding",
     )
+    sp.add_argument(
+        "--compact",
+        action="store_true",
+        help="Short summary only (detector → rule ids); omit per-finding details",
+    )
 
     args = p.parse_args()
     args.db_path = args.db_path.expanduser().resolve()
@@ -194,6 +232,7 @@ def main() -> int:
             args.text_source,
             args.json_out,
             args.hits_only,
+            args.compact,
         )
     return 1
 

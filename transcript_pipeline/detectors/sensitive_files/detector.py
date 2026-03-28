@@ -19,6 +19,17 @@ _PATH_PATTERNS: List[Tuple[str, str, str]] = [
     ("docker_config", r"(?i)config\.json\b.*docker|\.docker/config\.json\b"),
 ]
 
+_RULE_LABELS: dict[str, str] = {
+    "dotenv_file": "Reference to .env (or .env.*) — often holds API keys and secrets",
+    "aws_credentials_file": "Path to ~/.aws/credentials or similar",
+    "ssh_private_key_file": "SSH private key filename (id_rsa, id_ed25519, .pem)",
+    "gcp_service_account": "GCP service account JSON path pattern",
+    "kubeconfig": "kubeconfig or ~/.kube/config reference",
+    "npmrc_auth": ".npmrc (may contain auth tokens)",
+    "netrc": ".netrc (machine passwords)",
+    "docker_config": "Docker client config.json path pattern",
+}
+
 _COMPILED = [(rid, re.compile(pat)) for rid, pat in _PATH_PATTERNS]
 
 
@@ -42,7 +53,9 @@ class SensitiveFileDetector:
                     Finding(
                         detector_id=DETECTOR_ID,
                         rule_id=rule_id,
-                        label="Sensitive filename or path reference",
+                        label=_RULE_LABELS.get(
+                            rule_id, "Sensitive filename or path reference"
+                        ),
                         start=start,
                         end=end,
                         redacted_snippet=raw[:80] + ("…" if len(raw) > 80 else ""),

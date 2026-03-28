@@ -64,6 +64,9 @@ python3 -m transcript_pipeline db detect \
   --project-id Users-mahesh-Code-quick-mvp \
   --chat-id b608d697-fc98-423a-8ffd-5f3409aacbbd \
   --json
+
+# Short summary only (no per-finding reason/snippet lines)
+python3 -m transcript_pipeline db detect --compact --limit 20
 ```
 
 ## Web UI

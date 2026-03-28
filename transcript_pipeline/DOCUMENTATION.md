@@ -271,8 +271,11 @@ Runs **`analyze()`** from the detector orchestrator on text loaded from exchange
 | `--text-source` | `user` \| `assistant` \| `both` (default `both`). |
 | `--json` | Emit full per-row results including `findings`. |
 | `--hits-only` | Suppress rows with zero findings (text mode). |
+| `--compact` | One line per row: detector → rule ids only (no per-finding detail). |
 
 Each row: concatenate text per `--text-source`, run **all** registered detectors once, aggregate `Finding`s (redacted snippets only).
+
+**Default (non-JSON) output** prints each finding with: **`detector_id`**, **`rule_id`**, **`reason`** (from `Finding.label`), **`matched`** (redacted snippet), and **`span`** (character offsets in the scanned text). JSON output already includes `label`, `redacted_snippet`, and `start`/`end`.
 
 ---
 
