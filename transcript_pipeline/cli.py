@@ -9,6 +9,7 @@ from transcript_pipeline.db import TranscriptDB
 from transcript_pipeline.detectors import analyze
 from transcript_pipeline.detectors.types import Finding
 from transcript_pipeline.ingest import default_db_path
+from transcript_pipeline.scoring import score_report
 
 
 def _finding_to_dict(f: Finding) -> dict:
@@ -99,6 +100,17 @@ def _format_finding_line(f: dict, index: int) -> str:
     return "\n".join(lines)
 
 
+def _format_policy_text(pol_dict: dict) -> str:
+    combos = pol_dict.get("combo_bonuses") or []
+    cb = ", ".join(f"{c['name']}(+{c['bonus']})" for c in combos) if combos else "(none)"
+    alert = "ALERT" if pol_dict.get("alert") else "ok"
+    return (
+        f"  policy: score={pol_dict['score']:.1f}/{pol_dict['cap_applied']:.0f} "
+        f"raw={pol_dict['raw_points']:.1f} threshold={pol_dict['threshold']:.0f} "
+        f"[{alert}]  combos: {cb}"
+    )
+
+
 def cmd_detect(
     db: TranscriptDB,
     project_id: str | None,
@@ -108,6 +120,8 @@ def cmd_detect(
     json_out: bool,
     hits_only: bool,
     compact: bool,
+    do_score: bool,
+    alert_threshold: float,
 ) -> int:
     """Run registered detectors on exchange rows from the DB."""
     db.init_schema()
@@ -129,17 +143,23 @@ def cmd_detect(
             "summary": report.to_summary(),
             "findings": findings,
         }
+        if do_score:
+            pol = score_report(report, alert_threshold=alert_threshold)
+            rec["policy"] = pol.to_dict()
         out_rows.append(rec)
 
     if json_out:
         print(json.dumps(out_rows, indent=2))
         return 0
 
-    print(
+    hdr = (
         f"Scanned {len(rows)} exchange row(s) from DB "
         f"({len(out_rows)} after --hits-only filter).\n"
-        f"text_source={text_source}\n"
+        f"text_source={text_source}"
     )
+    if do_score:
+        hdr += f"\npolicy scoring: alert if score >= {alert_threshold}"
+    print(hdr + "\n")
     for rec in out_rows:
         s = rec["summary"]
         print(
@@ -147,17 +167,25 @@ def cmd_detect(
             f"turn={rec['turn_index']} — {s['finding_count']} finding(s)"
         )
         findings = rec["findings"]
-        if not findings:
-            continue
-        if compact:
-            by_d: dict[str, list[str]] = {}
-            for f in findings:
-                by_d.setdefault(f["detector_id"], []).append(f["rule_id"])
-            for det, rules in sorted(by_d.items()):
-                print(f"  {det}: {', '.join(sorted(set(rules)))}")
-        else:
-            for i, f in enumerate(findings, start=1):
-                print(_format_finding_line(f, i))
+        if findings:
+            if compact:
+                by_d: dict[str, list[str]] = {}
+                for f in findings:
+                    by_d.setdefault(f["detector_id"], []).append(f["rule_id"])
+                for det, rules in sorted(by_d.items()):
+                    print(f"  {det}: {', '.join(sorted(set(rules)))}")
+            else:
+                for i, f in enumerate(findings, start=1):
+                    print(_format_finding_line(f, i))
+        if do_score and "policy" in rec:
+            print(_format_policy_text(rec["policy"]))
+            pd = rec["policy"]
+            if not compact and pd.get("finding_breakdown"):
+                print("    points: " + ", ".join(
+                    f"{x['detector_id']}/{x['rule_id']}={x['weight']:.0f}"
+                    for x in pd["finding_breakdown"][:12]
+                ) + (" …" if len(pd["finding_breakdown"]) > 12 else ""))
+        print()
     return 0
 
 
@@ -206,6 +234,17 @@ def main() -> int:
         action="store_true",
         help="Short summary only (detector → rule ids); omit per-finding details",
     )
+    sp.add_argument(
+        "--score",
+        action="store_true",
+        help="Attach policy score (0–100) and alert flag; tune weights in scoring/registry.py",
+    )
+    sp.add_argument(
+        "--alert-threshold",
+        type=float,
+        default=75.0,
+        help="Alert when policy score >= this value (default: 75)",
+    )
 
     args = p.parse_args()
     args.db_path = args.db_path.expanduser().resolve()
@@ -233,6 +272,8 @@ def main() -> int:
             args.json_out,
             args.hits_only,
             args.compact,
+            args.score,
+            args.alert_threshold,
         )
     return 1
 

@@ -272,6 +272,8 @@ Runs **`analyze()`** from the detector orchestrator on text loaded from exchange
 | `--json` | Emit full per-row results including `findings`. |
 | `--hits-only` | Suppress rows with zero findings (text mode). |
 | `--compact` | One line per row: detector → rule ids only (no per-finding detail). |
+| `--score` | Add **`policy`** (score, raw_points, alert, breakdown, combo bonuses). |
+| `--alert-threshold` | Float; alert when `policy.score >= threshold` (default `75`). |
 
 Each row: concatenate text per `--text-source`, run **all** registered detectors once, aggregate `Finding`s (redacted snippets only).
 
@@ -310,7 +312,7 @@ Detectors are **plain classes** with:
 
 Nothing runs until **your code** calls `analyze` (e.g. `db detect` does that per row).
 
-### Default detectors (four separate concerns)
+### Default detectors (layered concerns)
 
 | Package / `id` | Responsibility |
 |----------------|----------------|
@@ -318,6 +320,11 @@ Nothing runs until **your code** calls `analyze` (e.g. `db detect` does that per
 | `detectors/pii/` → `pii` | Emails, phone-like patterns, SSN-shaped with light validation, credit-card-shaped **with Luhn**, US street heuristic, labeled account/customer IDs. |
 | `detectors/sensitive_context/` → `sensitive_context` | Keywords (confidential, internal-only, …), deployment/config filenames, internal hostnames, private IPs, dev home paths, git/GitHub URLs, export/dump/log filename patterns. |
 | `detectors/sensitive_files/` → `sensitive_files` | References to paths/files that often hold secrets (`.env`, `.aws/credentials`, kubeconfig, …). |
+| `detectors/context_detection/exposure_scope/` → `context_exposure_scope` | **Governance scope** (not misuse): classifies interaction size/structure into `small_snippet`, `moderate_internal_context`, or `broad_internal_context_transfer` using chars, fenced-code lines, and `@` refs. Emits at most one finding per scan with **meta** metrics. Tuned to avoid flagging tiny messages. |
+| `detectors/context_detection/paste_structure/` → `context_paste_structure` | Structured paste patterns: many markdown fences, many `@` references, or repeated “file:/path:” style labels — “multiple artifacts in one turn”. |
+| `detectors/context_detection/technical_markers/` → `context_technical_markers` | Tracebacks / `File "…", line`, dense path tokens, architecture & ops keywords — combine with other detectors for review. |
+
+Shared helpers: `detectors/context_detection/metrics.py` (`analyze_text_metrics`, `classify_exposure_tier`).
 
 ### Result types (`detectors/types.py`)
 
@@ -328,6 +335,14 @@ Nothing runs until **your code** calls `analyze` (e.g. `db detect` does that per
 ### Redaction (`detectors/redact.py`)
 
 Short previews for secret-like values; full raw matches are not stored on `Finding` by design.
+
+### Policy scoring (`scoring/`)
+
+Post-pass over an **`AnalysisReport`**: sums **per-(detector, rule) weights** from **`ScoringRegistry`**, adds **combo bonuses** (e.g. broad context + secrets), caps at **`score_cap`** (default 100), and sets **`alert = score >= threshold`** (default 75).
+
+- **`scoring/registry.py`** — `rule_weights` keyed by `detector_id` → `rule_id` → points; use `"*"` as default for that detector. Unknown pairs use **`global_fallback`** (dynamic when you add detectors without editing every rule).
+- **`scoring/engine.py`** — `score_report(report, alert_threshold=75)`, `PolicyScoreResult.to_dict()`, `score_findings_dicts()` for serialized findings.
+- **CLI:** `python3 -m transcript_pipeline db detect --score [--alert-threshold 75]` adds a **`policy`** object to JSON output and prints score / raw / combos in text mode.
 
 ---
 

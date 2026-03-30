@@ -102,6 +102,18 @@ def _compile() -> List[Tuple[str, str, Pattern[str]]]:
 
 _COMPILED = _compile()
 
+# `/Users/foo/` inside IDE metadata (Cursor, etc.) — low governance value.
+_TOOLING_PATH_AFTER_HOME = re.compile(
+    r"[/\\]\.cursor[/\\]|\.cursor[/\\]projects|[/\\]\.vscode[/\\]|"
+    r"AppData[/\\]Local[/\\]Programs[/\\]cursor",
+    re.IGNORECASE,
+)
+
+
+def _user_home_path_is_tooling_metadata(text: str, m: re.Match) -> bool:
+    tail = text[m.start() : min(len(text), m.end() + 160)]
+    return bool(_TOOLING_PATH_AFTER_HOME.search(tail))
+
 
 class SensitiveContextDetector:
     """Internal/confidential context: language, configs, hosts, paths, exports."""
@@ -117,6 +129,10 @@ class SensitiveContextDetector:
             for m in rx.finditer(text):
                 key = (m.start(), m.end(), rule_id)
                 if key in seen:
+                    continue
+                if rule_id == "user_home_path" and _user_home_path_is_tooling_metadata(
+                    text, m
+                ):
                     continue
                 seen.add(key)
                 raw = m.group(0)

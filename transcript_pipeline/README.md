@@ -2,6 +2,8 @@
 
 Reads Cursor `agent-transcripts/<chat_id>/<chat_id>.jsonl` files, parses **user / assistant** turns into normalized rows, and stores them in **SQLite** for analysis.
 
+NOTE: You will need to find and provide a project id and chat id for ingestion
+
 **Full reference (concepts, schema, every CLI flag, detectors):** [DOCUMENTATION.md](DOCUMENTATION.md) — start here if terms like **exchange** or **`db exchanges`** are unclear.
 
 ## Layout
@@ -67,7 +69,13 @@ python3 -m transcript_pipeline db detect \
 
 # Short summary only (no per-finding reason/snippet lines)
 python3 -m transcript_pipeline db detect --compact --limit 20
+
+# Policy score (0–100) + alert if score >= threshold (default 75)
+python3 -m transcript_pipeline db detect --score --hits-only --limit 10
+python3 -m transcript_pipeline db detect --score --alert-threshold 80 --json --limit 5
 ```
+
+Weights and combo rules: `transcript_pipeline/scoring/registry.py`.
 
 ## Web UI
 
@@ -89,7 +97,7 @@ report.to_summary()   # counts + rule ids
 report.findings     # Finding objects (redacted snippets only)
 ```
 
-Four separate detectors (no single fuzzy “sensitive” classifier):
+Detectors are separate classifiers (no single fuzzy “sensitive” score):
 
 | Package | `id` | Purpose |
 |---------|------|---------|
@@ -97,6 +105,11 @@ Four separate detectors (no single fuzzy “sensitive” classifier):
 | `detectors/pii/` | `pii` | Emails, phones, SSN-shaped (validated), PAN (Luhn), US street heuristic, labeled account IDs |
 | `detectors/sensitive_context/` | `sensitive_context` | Keywords (confidential/internal), auth/deployment filenames, internal hosts, private IPs, repo paths, export/log patterns |
 | `detectors/sensitive_files/` | `sensitive_files` | Path/filename references (`.env`, `.aws/credentials`, SSH keys, kubeconfig, …) |
+| `detectors/context_detection/exposure_scope/` | `context_exposure_scope` | Governance tiers: `small_snippet` / `moderate_internal_context` / `broad_internal_context_transfer` (volume + fences; not “large = bad” alone) |
+| `detectors/context_detection/paste_structure/` | `context_paste_structure` | Many fenced blocks, many `@` refs, multi-file labeled sections |
+| `detectors/context_detection/technical_markers/` | `context_technical_markers` | Tracebacks, dense paths, architecture/incident language |
+
+Context detectors are **visibility signals** — combine with secrets/PII for escalation. `detectors/context_detection/metrics.py` holds shared thresholds.
 
 `detectors/orchestrator.py` composes them; extend with `register_detector(MyDetector())`.
 

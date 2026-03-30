@@ -2,6 +2,11 @@ from __future__ import annotations
 
 from typing import List, Protocol, Sequence, runtime_checkable
 
+from transcript_pipeline.detectors.context_detection import (
+    ExposureScopeDetector,
+    PasteStructureDetector,
+    TechnicalContextMarkersDetector,
+)
 from transcript_pipeline.detectors.pii import PIIDetector
 from transcript_pipeline.detectors.secrets import SecretDetector
 from transcript_pipeline.detectors.sensitive_context import SensitiveContextDetector
@@ -20,12 +25,14 @@ class Detector(Protocol):
 
 
 def _default_instances() -> List[Detector]:
-    # Three focused classifiers + path references (separate package).
     return [
         SecretDetector(),
         PIIDetector(),
         SensitiveContextDetector(),
         SensitiveFileDetector(),
+        ExposureScopeDetector(),
+        PasteStructureDetector(),
+        TechnicalContextMarkersDetector(),
     ]
 
 

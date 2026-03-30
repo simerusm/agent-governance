@@ -32,6 +32,9 @@ _RULE_LABELS: dict[str, str] = {
 
 _COMPILED = [(rid, re.compile(pat)) for rid, pat in _PATH_PATTERNS]
 
+# Avoid inflating scores when assistants repeat the same path tokens many times.
+_MAX_FINDINGS_PER_RULE = 5
+
 
 class SensitiveFileDetector:
     id = DETECTOR_ID
@@ -41,13 +44,17 @@ class SensitiveFileDetector:
             return []
         out: List[Finding] = []
         seen: set[tuple[int, int, str]] = set()
+        per_rule_count: dict[str, int] = {}
         for rule_id, rx in _COMPILED:
             for m in rx.finditer(text):
                 start, end = m.start(), m.end()
                 key = (start, end, rule_id)
                 if key in seen:
                     continue
+                if per_rule_count.get(rule_id, 0) >= _MAX_FINDINGS_PER_RULE:
+                    continue
                 seen.add(key)
+                per_rule_count[rule_id] = per_rule_count.get(rule_id, 0) + 1
                 raw = text[start:end]
                 out.append(
                     Finding(

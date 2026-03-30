@@ -21,6 +21,40 @@ _PHONE_RX = re.compile(
     r"\d{3}[\s.\-]\d{4}[\s.\-]\d{4})\b"
 )
 
+# Hostname / cloud context: phone-like digit runs inside these are usually account ids, not phones.
+_PHONE_CLOUD_MARKERS = (
+    "amazonaws.com",
+    ".dkr.ecr.",
+    "arn:aws:",
+    "console.aws.amazon.com",
+    "microsoftonline.com",
+    "storage.googleapis.com",
+    "googleapis.com",
+    "azure.com",
+    "cloud.google.com",
+)
+
+
+def _phone_likely_false_positive(text: str, m: re.Match, raw: str) -> bool:
+    start, end = m.start(), m.end()
+    lo = max(0, start - 72)
+    hi = min(len(text), end + 72)
+    window = text[lo:hi].lower()
+    if any(marker in window for marker in _PHONE_CLOUD_MARKERS):
+        return True
+
+    i = start
+    while i > 0 and text[i - 1].isdigit():
+        i -= 1
+    j = end
+    while j < len(text) and text[j].isdigit():
+        j += 1
+    run_len = j - i
+    has_phone_formatting = bool(re.search(r"[\s.\-+()]", raw))
+    if run_len > 10 and not has_phone_formatting:
+        return True
+    return False
+
 _SSN_RX = re.compile(r"\b\d{3}-\d{2}-\d{4}\b")
 
 # Candidate PAN: groups of 4 digits, optional separators, 13-19 digits total
@@ -89,6 +123,8 @@ class PIIDetector:
             raw = m.group(0)
             digits = re.sub(r"\D", "", raw)
             if len(digits) < 10:
+                continue
+            if _phone_likely_false_positive(text, m, raw):
                 continue
             findings.append(
                 Finding(

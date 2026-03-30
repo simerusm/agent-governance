@@ -1,5 +1,5 @@
 """
-Pluggable text detectors: secrets, PII, sensitive context, path references.
+Pluggable text detectors: secrets, PII, sensitive context, paths, and governance context scope.
 
 Primary API::
 
@@ -15,6 +15,11 @@ from transcript_pipeline.detectors.orchestrator import (
     list_detectors,
     register_detector,
     reset_default_detectors,
+)
+from transcript_pipeline.detectors.context_detection import (
+    ExposureScopeDetector,
+    PasteStructureDetector,
+    TechnicalContextMarkersDetector,
 )
 from transcript_pipeline.detectors.pii import PIIDetector
 from transcript_pipeline.detectors.secrets import SecretDetector, scan_secrets
@@ -35,5 +40,8 @@ __all__ = [
     "PIIDetector",
     "SensitiveContextDetector",
     "SensitiveFileDetector",
+    "ExposureScopeDetector",
+    "PasteStructureDetector",
+    "TechnicalContextMarkersDetector",
     "scan_secrets",
 ]
