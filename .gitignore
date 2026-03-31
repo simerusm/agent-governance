@@ -46,3 +46,10 @@ htmlcov/
 
 # Captured logs from ide-interceptor
 ide-interceptor/captured_chat.jsonl
+
+# Terraform
+**/.terraform/
+**/.terraform.lock.hcl
+**/*.tfplan
+infrastructure/terraform/state/*.tfstate
+infrastructure/terraform/state/*.tfstate.*

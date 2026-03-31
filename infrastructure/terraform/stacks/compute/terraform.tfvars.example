@@ -1,0 +1,8 @@
+## Copy to terraform.tfvars and adjust for your environment.
+
+kubernetes_version  = "1.30"
+node_instance_types = ["t3.small"]
+desired_size        = 2
+min_size            = 1
+max_size            = 4
+
