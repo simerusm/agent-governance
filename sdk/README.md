@@ -57,6 +57,7 @@ Override defaults in code: `load_config(overrides={"default_policy": "strict", .
 
 - **`DefaultRuntimeClient`** — Creates a `RunContext`, runs `fn(*args, **kwargs)`, clears context when done. No network.
 - **`HttpReportingClient`** — Delegates to an inner client (default: `DefaultRuntimeClient`), then POSTs JSON to `{base}/v1/runs` with policy, agent name, status, elapsed time, and error class/message on failure. **User task text and arguments are not sent** by default.
+- **`RuntimeLayerClient`** — Delegates execution to the richer [`runtime/`](../runtime/) layer (lifecycle hooks + inline governance around LLM I/O). This is the bridge for “governed runtime” behavior.
 
 Implement **`RuntimeClient`** yourself to forward runs to a sandbox, queue, or internal orchestrator without changing decorator code.
 

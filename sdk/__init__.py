@@ -6,7 +6,13 @@ to a pluggable :class:`RuntimeClient`.
 """
 
 from .artifacts import ArtifactRef, record_artifact
-from .client import DefaultRuntimeClient, HttpReportingClient, RuntimeClient, build_client_from_config
+from .client import (
+    DefaultRuntimeClient,
+    HttpReportingClient,
+    RuntimeClient,
+    RuntimeLayerClient,
+    build_client_from_config,
+)
 from .config import GovernanceConfig, load_config
 from .context import AgentMetadata, RunContext, current_run_context, run_context, with_run_context
 from .decorators import get_default_client, governed_agent, set_default_client
@@ -19,6 +25,7 @@ __all__ = [
     "GovernanceConfig",
     "HttpReportingClient",
     "RuntimeClient",
+    "RuntimeLayerClient",
     "RunContext",
     "build_client_from_config",
     "current_run_context",

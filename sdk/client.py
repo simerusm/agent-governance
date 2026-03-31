@@ -44,6 +44,26 @@ class DefaultRuntimeClient:
             return fn(*args, **kwargs)
 
 
+class RuntimeLayerClient:
+    """
+    Runtime-backed client: delegates run lifecycle + governance decisions to `runtime/`.
+
+    This is the intended bridge from the thin SDK decorator to the richer runtime layer.
+    """
+
+    def __init__(self, runner: Any) -> None:
+        self._runner = runner
+
+    def run_agent(
+        self,
+        fn: Callable[..., Any],
+        metadata: AgentMetadata,
+        args: tuple[Any, ...],
+        kwargs: dict[str, Any],
+    ) -> Any:
+        return self._runner.run_agent(fn, metadata, args, kwargs)
+
+
 class HttpReportingClient:
     """
     Executes the function locally (same process), then POSTs a minimal run report to
